@@ -1,11 +1,6 @@
-// api/transcript.js
-// Vercel serverless function. Place this file at: api/transcript.js in your repo root.
-// Vercel auto-deploys anything in /api as a serverless endpoint — no extra config needed.
-
-const { YoutubeTranscript } = require('youtube-transcript');
+const { Innertube } = require('youtubei.js');
 
 module.exports = async (req, res) => {
-  // Allow your frontend to call this (same-origin on Vercel, but harmless to keep)
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   const { videoId, url } = req.query;
@@ -16,15 +11,19 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(id);
+    const yt = await Innertube.create({ retrieve_player: false });
+    const info = await yt.getInfo(id);
+    const transcriptData = await info.getTranscript();
+
+    const segments = transcriptData.transcript.content.body.initial_segments.map(seg => ({
+      start: Math.round(Number(seg.start_ms) / 1000),
+      text: seg.snippet.text
+    }));
 
     return res.status(200).json({
       videoId: id,
-      segments: transcript.map(t => ({
-        start: Math.round(t.offset / 1000),
-        text: t.text
-      })),
-      fullText: transcript.map(t => t.text).join(' ')
+      segments,
+      fullText: segments.map(s => s.text).join(' ')
     });
   } catch (err) {
     console.error('Transcript fetch failed:', err);
@@ -39,4 +38,4 @@ function extractVideoId(url) {
   if (!url) return null;
   const match = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : null;
-                               }
+}

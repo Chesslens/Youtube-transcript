@@ -27,7 +27,11 @@ module.exports = async (req, res) => {
       fullText: transcript.map(t => t.text).join(' ')
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Could not fetch transcript. Captions may be disabled for this video.' });
+    console.error('Transcript fetch failed:', err);
+    return res.status(500).json({
+      error: 'Could not fetch transcript.',
+      debug: err.message || String(err)
+    });
   }
 };
 

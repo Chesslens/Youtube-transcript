@@ -2,6 +2,7 @@
   "name": "transcript-tool",
   "version": "1.0.0",
   "dependencies": {
-    "youtube-caption-extractor": "^2.0.0"
+    "youtube-caption-extractor": "^2.0.0",
+    "youtubei.js": "^13.4.0"
   }
 }

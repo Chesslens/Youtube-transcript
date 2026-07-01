@@ -1,4 +1,4 @@
-const { Innertube } = require('youtubei.js');
+const { getSubtitles } = require('youtube-caption-extractor');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -11,24 +11,12 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const yt = await Innertube.create();
-    const info = await yt.getInfo(id);
+    const subtitles = await getSubtitlesWithRetry(id);
 
-    const tracks = info.captions?.caption_tracks;
-    if (!tracks || tracks.length === 0) {
-      return res.status(500).json({ error: 'Could not fetch transcript.', debug: 'No caption tracks found for this video.' });
-    }
-
-    const track = tracks.find(t => t.language_code === 'en') || tracks[0];
-    const captionRes = await fetch(track.base_url + '&fmt=json3');
-    const captionData = await captionRes.json();
-
-    const segments = (captionData.events || [])
-      .filter(e => e.segs)
-      .map(e => ({
-        start: Math.round(e.tStartMs / 1000),
-        text: e.segs.map(s => s.utf8).join('')
-      }));
+    const segments = subtitles.map(s => ({
+      start: Math.round(Number(s.start)),
+      text: s.text
+    }));
 
     return res.status(200).json({
       videoId: id,
@@ -43,6 +31,19 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+async function getSubtitlesWithRetry(videoID, lang = 'en', maxAttempts = 3) {
+  let lastError;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      return await getSubtitles({ videoID, lang });
+    } catch (err) {
+      lastError = err;
+      await new Promise(r => setTimeout(r, 500 * (i + 1)));
+    }
+  }
+  throw lastError;
+}
 
 function extractVideoId(url) {
   if (!url) return null;

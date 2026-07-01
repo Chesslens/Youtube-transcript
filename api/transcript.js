@@ -11,14 +11,24 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const yt = await Innertube.create({ retrieve_player: false });
+    const yt = await Innertube.create();
     const info = await yt.getInfo(id);
-    const transcriptData = await info.getTranscript();
 
-    const segments = transcriptData.transcript.content.body.initial_segments.map(seg => ({
-      start: Math.round(Number(seg.start_ms) / 1000),
-      text: seg.snippet.text
-    }));
+    const tracks = info.captions?.caption_tracks;
+    if (!tracks || tracks.length === 0) {
+      return res.status(500).json({ error: 'Could not fetch transcript.', debug: 'No caption tracks found for this video.' });
+    }
+
+    const track = tracks.find(t => t.language_code === 'en') || tracks[0];
+    const captionRes = await fetch(track.base_url + '&fmt=json3');
+    const captionData = await captionRes.json();
+
+    const segments = (captionData.events || [])
+      .filter(e => e.segs)
+      .map(e => ({
+        start: Math.round(e.tStartMs / 1000),
+        text: e.segs.map(s => s.utf8).join('')
+      }));
 
     return res.status(200).json({
       videoId: id,

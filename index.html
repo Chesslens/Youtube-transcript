@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transcript Puller</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --ink:#181614;
+    --paper:#F7F4EE;
+    --tape:#E4472B;
+    --line:#D8D2C4;
+    --mono-dim:#8B8578;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Mono', monospace;
+    padding:40px 20px 80px;
+  }
+  .wrap{max-width:640px;margin:0 auto;}
+
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.14em;
+    color:var(--tape);
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,5vw,40px);
+    margin:0 0 8px;
+    line-height:1.05;
+  }
+  .sub{color:var(--mono-dim);font-size:14px;margin-bottom:28px;}
+
+  .bar{
+    display:flex;
+    gap:0;
+    border:2px solid var(--ink);
+  }
+  input{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:14px 14px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:14px;
+    color:var(--ink);
+    outline:none;
+  }
+  input::placeholder{color:var(--mono-dim);}
+  button{
+    border:none;
+    border-left:2px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    padding:0 22px;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    letter-spacing:.02em;
+  }
+  button:hover{background:var(--tape);}
+  button:disabled{opacity:.5;cursor:wait;}
+
+  .status{
+    margin-top:14px;
+    font-size:13px;
+    color:var(--mono-dim);
+    min-height:18px;
+  }
+  .status.error{color:var(--tape);}
+
+  .result{margin-top:32px;display:none;}
+  .result.show{display:block;}
+  .result-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+    margin-bottom:16px;
+  }
+  .result-head h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px;
+    margin:0;
+  }
+  .copy-btn{
+    background:none;
+    border:1px solid var(--ink);
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    padding:6px 12px;
+    cursor:pointer;
+  }
+  .copy-btn:hover{background:var(--ink);color:var(--paper);}
+
+  .segment{
+    display:flex;
+    gap:16px;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    font-size:14px;
+    line-height:1.5;
+  }
+  .segment time{
+    flex-shrink:0;
+    color:var(--tape);
+    font-weight:500;
+    width:52px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Paste. Pull. Read.</div>
+  <h1>Transcript Puller</h1>
+  <p class="sub">Drop a YouTube link, get the full transcript with timestamps.</p>
+
+  <div class="bar">
+    <input id="urlInput" type="text" placeholder="https://www.youtube.com/watch?v=..." />
+    <button id="fetchBtn">Pull it</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div class="result" id="result">
+    <div class="result-head">
+      <h2 id="videoLabel">Transcript</h2>
+      <button class="copy-btn" id="copyBtn">Copy all</button>
+    </div>
+    <div id="segments"></div>
+  </div>
+</div>
+
+<script>
+  // Same-origin on Vercel — no external URL needed
+  const API_URL = "/api/transcript";
+
+  const urlInput = document.getElementById('urlInput');
+  const fetchBtn = document.getElementById('fetchBtn');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const segmentsEl = document.getElementById('segments');
+  const videoLabel = document.getElementById('videoLabel');
+  const copyBtn = document.getElementById('copyBtn');
+
+  let currentFullText = '';
+
+  function fmtTime(sec){
+    const m = Math.floor(sec/60);
+    const s = String(sec%60).padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  async function getTranscript(){
+    const url = urlInput.value.trim();
+    if(!url){ status.textContent = 'Paste a YouTube URL first.'; status.className='status error'; return; }
+
+    fetchBtn.disabled = true;
+    status.className = 'status';
+    status.textContent = 'Fetching transcript…';
+    result.classList.remove('show');
+
+    try{
+      const res = await fetch(`${API_URL}?url=${encodeURIComponent(url)}`);
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || 'Failed to fetch transcript');
+
+      currentFullText = data.fullText;
+      videoLabel.textContent = `Transcript — ${data.videoId}`;
+      segmentsEl.innerHTML = data.segments.map(s =>
+        `<div class="segment"><time>${fmtTime(s.start)}</time><span>${escapeHtml(s.text)}</span></div>`
+      ).join('');
+
+      result.classList.add('show');
+      status.textContent = `${data.segments.length} segments retrieved.`;
+    }catch(err){
+      status.textContent = err.message;
+      status.className = 'status error';
+    }finally{
+      fetchBtn.disabled = false;
+    }
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  fetchBtn.addEventListener('click', getTranscript);
+  urlInput.addEventListener('keydown', e => { if(e.key === 'Enter') getTranscript(); });
+
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(currentFullText);
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => copyBtn.textContent = 'Copy all', 1500);
+  });
+</script>
+</body>
+</html>

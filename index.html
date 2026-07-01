@@ -174,7 +174,7 @@
     try{
       const res = await fetch(`${API_URL}?url=${encodeURIComponent(url)}`);
       const data = await res.json();
-      if(!res.ok) throw new Error(data.error || 'Failed to fetch transcript');
+      if(!res.ok) throw new Error((data.error || 'Failed to fetch transcript') + (data.debug ? ' — ' + data.debug : ''));
 
       currentFullText = data.fullText;
       videoLabel.textContent = `Transcript — ${data.videoId}`;

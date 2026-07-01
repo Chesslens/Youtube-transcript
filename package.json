@@ -2,6 +2,6 @@
   "name": "transcript-tool",
   "version": "1.0.0",
   "dependencies": {
-    "youtube-transcript": "^1.2.1"
+    "youtubei.js": "^13.4.0"
   }
 }

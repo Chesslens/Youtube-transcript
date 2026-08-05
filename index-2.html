@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>DEAD LINE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Share+Tech+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0a0c08;
+    --bone:#dcd6c2;
+    --blood:#b3241f;
+    --blood-bright:#e8433c;
+    --sick:#7a8b52;
+    --sick-dim:#4b5636;
+    --line-glow: 0 0 12px rgba(230,60,50,0.9), 0 0 28px rgba(230,60,50,0.5);
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background:#000; font-family:'Share Tech Mono', monospace; color:var(--bone);
+    touch-action:none; overscroll-behavior:none;
+  }
+  #c{ position:fixed; inset:0; display:block; touch-action:none; }
+
+  .title-face{ font-family:'Creepster', cursive; letter-spacing:2px; }
+
+  /* ---------- overlays ---------- */
+  .screen{
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:24px; z-index:20; background:radial-gradient(ellipse at center, rgba(20,14,10,0.55) 0%, rgba(3,3,2,0.94) 78%);
+    transition:opacity .5s ease; gap:14px;
+  }
+  .hidden{ display:none !important; }
+  .fade-out{ opacity:0; pointer-events:none; }
+
+  .logo{
+    font-size:min(17vw, 92px); color:var(--blood-bright); text-shadow:var(--line-glow);
+    line-height:0.85; margin:0;
+  }
+  .sub{ font-size:13px; letter-spacing:5px; color:var(--sick); text-transform:uppercase; margin-top:-6px; }
+  .desc{ max-width:340px; font-size:13px; line-height:1.7; color:#a99; opacity:.85; }
+  .desc b{ color:var(--bone); }
+
+  .btn{
+    font-family:'Share Tech Mono', monospace; font-weight:700; letter-spacing:3px; text-transform:uppercase;
+    font-size:15px; padding:16px 38px; margin-top:6px; background:linear-gradient(180deg,#8f2622,#5c1613);
+    color:var(--bone); border:1px solid #d3453f; border-radius:2px; cursor:pointer;
+    box-shadow:0 0 0 1px #000 inset, 0 6px 0 #2a0805, var(--line-glow);
+    transform:translateY(0); transition:transform .08s ease;
+  }
+  .btn:active{ transform:translateY(5px); box-shadow:0 0 0 1px #000 inset, 0 1px 0 #2a0805; }
+
+  #loading-screen{ z-index:30; }
+  .bar-outer{ width:min(70vw,320px); height:10px; border:1px solid var(--sick-dim); background:#0e120a; margin-top:10px; position:relative; }
+  .bar-inner{ height:100%; width:0%; background:linear-gradient(90deg,var(--sick-dim),var(--sick)); transition:width .15s ease; }
+  .load-label{ font-size:11px; letter-spacing:3px; color:var(--sick); margin-top:8px; text-transform:uppercase; }
+
+  /* ---------- HUD ---------- */
+  #hud{ position:fixed; inset:0; pointer-events:none; z-index:10; }
+  .hud-top{
+    position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:flex-start;
+    padding:calc(10px + env(safe-area-inset-top)) 14px 0 14px;
+  }
+  .hud-block{ display:flex; flex-direction:column; gap:6px; }
+  .wave-tag{ font-size:11px; letter-spacing:3px; color:var(--sick); text-transform:uppercase; }
+  .score-num{ font-size:22px; color:var(--bone); font-weight:700; text-shadow:0 0 8px rgba(0,0,0,.8); }
+  .hp-wrap{ width:150px; }
+  .hp-label{ font-size:10px; letter-spacing:2px; color:var(--sick); margin-bottom:3px; text-transform:uppercase; }
+  .hp-outer{ height:12px; border:1px solid #3a1210; background:#150807; box-shadow:0 0 0 1px #000; }
+  .hp-inner{ height:100%; width:100%; background:linear-gradient(90deg,#7a120e,var(--blood-bright)); transition:width .25s ease; }
+
+  .combo{
+    position:absolute; top:70px; right:14px; font-size:13px; color:var(--blood-bright); letter-spacing:2px;
+    opacity:0; transform:scale(.8); transition:opacity .15s ease, transform .15s ease; text-shadow:var(--line-glow);
+  }
+  .combo.show{ opacity:1; transform:scale(1); }
+
+  .wave-banner{
+    position:absolute; top:40%; left:50%; transform:translate(-50%,-50%) scale(.85); text-align:center;
+    opacity:0; transition:opacity .35s ease, transform .35s ease; pointer-events:none;
+  }
+  .wave-banner.show{ opacity:1; transform:translate(-50%,-50%) scale(1); }
+  .wave-banner .wt1{ font-size:13px; letter-spacing:6px; color:var(--sick); text-transform:uppercase; }
+  .wave-banner .wt2{ font-family:'Creepster',cursive; font-size:52px; color:var(--blood-bright); text-shadow:var(--line-glow); line-height:1; }
+
+  #flash{ position:fixed; inset:0; background:var(--blood); opacity:0; pointer-events:none; z-index:15; mix-blend-mode:screen; }
+
+  .ripple{
+    position:fixed; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%;
+    border:2px solid rgba(232,67,60,.9); pointer-events:none; z-index:12; opacity:1;
+    animation:rip .35s ease-out forwards;
+  }
+  @keyframes rip{ to{ width:56px; height:56px; margin:-28px 0 0 -28px; opacity:0; } }
+
+  .pop{
+    position:fixed; pointer-events:none; z-index:13; font-weight:700; font-size:15px;
+    color:var(--bone); text-shadow:0 0 6px rgba(0,0,0,.9); animation:popfloat .7s ease-out forwards;
+  }
+  .pop.kill{ color:var(--blood-bright); font-size:17px; }
+  @keyframes popfloat{ 0%{ opacity:1; transform:translateY(0);} 100%{ opacity:0; transform:translateY(-38px);} }
+
+  #gameover-screen h2{ font-family:'Creepster',cursive; font-size:min(13vw,54px); color:var(--blood-bright); text-shadow:var(--line-glow); margin:0; line-height:1; }
+  .stat-row{ display:flex; gap:26px; margin-top:6px; }
+  .stat{ display:flex; flex-direction:column; align-items:center; }
+  .stat .n{ font-size:26px; color:var(--bone); }
+  .stat .l{ font-size:10px; letter-spacing:2px; color:var(--sick); text-transform:uppercase; margin-top:2px; }
+
+  a.credit{ color:var(--sick); opacity:.7; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<!-- LOADING -->
+<div id="loading-screen" class="screen">
+  <h1 class="logo title-face">DEAD<br>LINE</h1>
+  <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+  <div class="load-label" id="load-label">WAKING THE DEAD… 0%</div>
+</div>
+
+<!-- START -->
+<div id="start-screen" class="screen hidden">
+  <h1 class="logo title-face">DEAD<br>LINE</h1>
+  <div class="sub">they don't stop until you do</div>
+  <p class="desc">The line in front of the barricade is all that separates you from them. <b>Tap a zombie to shoot it.</b> Let too many cross the line, and it's over.</p>
+  <button class="btn" id="start-btn">Hold the Line</button>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover-screen" class="screen hidden">
+  <h2>THE LINE HAS FALLEN</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="n" id="final-score">0</div><div class="l">Score</div></div>
+    <div class="stat"><div class="n" id="final-wave">1</div><div class="l">Wave Reached</div></div>
+    <div class="stat"><div class="n" id="final-kills">0</div><div class="l">Kills</div></div>
+  </div>
+  <button class="btn" id="retry-btn">Rise Again</button>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-top">
+    <div class="hud-block">
+      <div class="wave-tag" id="wave-label">WAVE 1</div>
+      <div class="score-num" id="score-label">0</div>
+    </div>
+    <div class="hud-block" style="align-items:flex-end;">
+      <div class="hp-label">Barricade</div>
+      <div class="hp-wrap"><div class="hp-outer"><div class="hp-inner" id="hp-bar"></div></div></div>
+    </div>
+  </div>
+  <div class="combo" id="combo-label">COMBO x2</div>
+  <div class="wave-banner" id="wave-banner">
+    <div class="wt1">Incoming</div>
+    <div class="wt2" id="wave-banner-num">WAVE 1</div>
+  </div>
+</div>
+
+<div id="flash"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+
+/* ============================================================
+   CONFIG — tune these if the model looks off (scale / facing)
+   ============================================================ */
+const MODEL_URL          = './zombies.glb';
+const CHAR_NAMES = [
+  'lpFemale_zombie_A','lpFemale_zombie_B','lpFemale_zombie_C','lpFemale_zombie_D','lpFemale_zombie_E',
+  'lpMale_zombie_A','lpMale_zombie_B','lpMale_zombie_C','lpMale_zombie_D','lpMale_zombie_E'
+];
+const ZOMBIE_SCALE        = 0.011;   // model is authored ~165 units tall -> ~1.8m
+const ZOMBIE_FACING_YAW   = Math.PI; // flip to 0 if zombies appear to walk backwards
+const LANES               = [-6.5, -3.8, -1.3, 1.3, 3.8, 6.5];
+const SPAWN_Z              = -30;
+const LINE_Z                = -1.6;   // the "dead line"
+const MAX_ALIVE             = 13;
+
+/* ============================================================
+   RENDERER / SCENE
+   ============================================================ */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x05060a);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0c0e, 0.045);
+
+const camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 120);
+camera.position.set(0, 1.75, 3.2);
+camera.lookAt(0, 1.2, -20);
+const camBase = camera.position.clone();
+
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w/h;
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+resize();
+
+/* ---- lighting ---- */
+scene.add(new THREE.AmbientLight(0x2c3320, 0.9));
+const moon = new THREE.DirectionalLight(0x9fb3d9, 0.55);
+moon.position.set(-6, 10, 4);
+scene.add(moon);
+
+const torch1 = new THREE.PointLight(0xff8a3d, 2.2, 14, 2);
+torch1.position.set(-2.4, 1.6, 0.4);
+scene.add(torch1);
+const torch2 = new THREE.PointLight(0xff8a3d, 2.2, 14, 2);
+torch2.position.set(2.4, 1.6, 0.4);
+scene.add(torch2);
+
+/* ---- ground ---- */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(140, 140),
+  new THREE.MeshStandardMaterial({ color:0x232a1c, roughness:1, metalness:0 })
+);
+ground.rotation.x = -Math.PI/2;
+scene.add(ground);
+
+// lane markers (subtle, cosmetic)
+for(const lx of LANES){
+  const strip = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.9, 34),
+    new THREE.MeshStandardMaterial({ color:0x1b2114, roughness:1 })
+  );
+  strip.rotation.x = -Math.PI/2;
+  strip.position.set(lx, 0.01, -16);
+  scene.add(strip);
+}
+
+// scattered tombstones for atmosphere
+const stoneMat = new THREE.MeshStandardMaterial({ color:0x3a3a38, roughness:0.9 });
+for(let i=0;i<22;i++){
+  const w = 0.5+Math.random()*0.4, h = 0.7+Math.random()*0.5;
+  const stone = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.18), stoneMat);
+  const side = Math.random()<0.5 ? -1 : 1;
+  stone.position.set(side*(8+Math.random()*7), h/2, -4-Math.random()*24);
+  stone.rotation.y = (Math.random()-0.5)*0.6;
+  stone.rotation.z = (Math.random()-0.5)*0.15;
+  scene.add(stone);
+}
+
+/* ---- barricade + the dead line ---- */
+const barricadeGroup = new THREE.Group();
+const woodMat = new THREE.MeshStandardMaterial({ color:0x3f2c1d, roughness:1 });
+for(let i=-4;i<=4;i++){
+  const plank = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.2+Math.random()*0.3, 0.22), woodMat);
+  plank.position.set(i*1.7, 0.7, 0.3);
+  plank.rotation.z = (Math.random()-0.5)*0.08;
+  barricadeGroup.add(plank);
+}
+const rail = new THREE.Mesh(new THREE.BoxGeometry(16.2,0.15,0.15), woodMat);
+rail.position.set(0, 1.15, 0.3);
+barricadeGroup.add(rail);
+scene.add(barricadeGroup);
+
+const lineMat = new THREE.MeshBasicMaterial({ color:0xe6392f, transparent:true, opacity:0.55, side:THREE.DoubleSide });
+const deadLine = new THREE.Mesh(new THREE.PlaneGeometry(16, 0.12), lineMat);
+deadLine.rotation.x = -Math.PI/2;
+deadLine.position.set(0, 0.02, LINE_Z);
+scene.add(deadLine);
+
+/* ============================================================
+   LOAD MODEL
+   ============================================================ */
+const loadingScreen = document.getElementById('loading-screen');
+const startScreen   = document.getElementById('start-screen');
+const bar = document.getElementById('bar');
+const loadLabel = document.getElementById('load-label');
+
+let templates = [];
+let baseClip = null;
+
+new GLTFLoader().load(MODEL_URL, (gltf)=>{
+  baseClip = gltf.animations && gltf.animations[0] ? gltf.animations[0] : null;
+  for(const name of CHAR_NAMES){
+    const src = gltf.scene.getObjectByName(name);
+    if(src) templates.push(src);
+  }
+  if(templates.length === 0){
+    loadLabel.textContent = 'Could not find character rigs in model.';
+    return;
+  }
+  loadingScreen.classList.add('fade-out');
+  setTimeout(()=>{ loadingScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }, 500);
+}, (xhr)=>{
+  if(xhr.total){
+    const pct = Math.min(100, Math.round(xhr.loaded/xhr.total*100));
+    bar.style.width = pct+'%';
+    loadLabel.textContent = 'WAKING THE DEAD… ' + pct + '%';
+  }
+}, (err)=>{
+  loadLabel.textContent = 'Failed to load model — see console.';
+  console.error(err);
+});
+
+/* ============================================================
+   AUDIO (tiny synth, no assets needed)
+   ============================================================ */
+let actx = null;
+function audio(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); return actx; }
+function beep(freq, dur, type='square', vol=0.06, glideTo=null){
+  try{
+    const ctx = audio();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    if(glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, ctx.currentTime+dur);
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime+dur);
+  }catch(e){}
+}
+const sfxShoot = ()=> beep(180, 0.08, 'square', 0.05, 90);
+const sfxHit   = ()=> beep(520, 0.06, 'triangle', 0.05, 260);
+const sfxKill  = ()=> beep(140, 0.18, 'sawtooth', 0.06, 40);
+const sfxHurt  = ()=> beep(90, 0.28, 'sawtooth', 0.09, 30);
+const sfxWave  = ()=> { beep(220,0.12,'sine',0.05,440); setTimeout(()=>beep(440,0.14,'sine',0.05,660),120); };
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const hudEl = document.getElementById('hud');
+const scoreLabel = document.getElementById('score-label');
+const waveLabel = document.getElementById('wave-label');
+const hpBar = document.getElementById('hp-bar');
+const comboLabel = document.getElementById('combo-label');
+const waveBanner = document.getElementById('wave-banner');
+const waveBannerNum = document.getElementById('wave-banner-num');
+const flashEl = document.getElementById('flash');
+const gameoverScreen = document.getElementById('gameover-screen');
+
+let state = 'menu'; // menu | playing | gameover
+let score = 0, kills = 0, wave = 0, hp = 100;
+let comboCount = 0, lastKillTime = -99;
+let zombies = [];
+let spawnTimer = 0, spawnedThisWave = 0, waveTarget = 0, spawnInterval = 1.2;
+let betweenWaves = false, waveDelayTimer = 0;
+
+const raycaster = new THREE.Raycaster();
+const clock = new THREE.Clock();
+
+function waveHP(w){ return 1 + Math.floor((w-1)/2.2); }
+function waveSpeed(w){ return Math.min(4.6, 2.0 + w*0.16); }
+function waveCount(w){ return 4 + w*2; }
+function waveSpawnInterval(w){ return Math.max(0.32, 1.25 - w*0.06); }
+
+function startGame(){
+  score=0; kills=0; wave=0; hp=100; comboCount=0;
+  for(const z of zombies) removeZombie(z, false);
+  zombies = [];
+  updateHUD();
+  state='playing';
+  hudEl.classList.remove('hidden');
+  gameoverScreen.classList.add('hidden');
+  startScreen.classList.add('hidden');
+  nextWave();
+}
+
+function nextWave(){
+  wave++;
+  waveTarget = waveCount(wave);
+  spawnedThisWave = 0;
+  spawnInterval = waveSpawnInterval(wave);
+  spawnTimer = 0;
+  betweenWaves = false;
+  waveLabel.textContent = 'WAVE ' + wave;
+  waveBannerNum.textContent = 'WAVE ' + wave;
+  waveBanner.classList.add('show');
+  sfxWave();
+  setTimeout(()=> waveBanner.classList.remove('show'), 1400);
+}
+
+function updateHUD(){
+  scoreLabel.textContent = score;
+  hpBar.style.width = Math.max(0,hp) + '%';
+}
+
+/* ---- zombie spawn / lifecycle ---- */
+function spawnZombie(){
+  const template = templates[Math.floor(Math.random()*templates.length)];
+  const root = SkeletonUtils.clone(template);
+  const uniqueMats = [];
+  root.traverse(o=>{
+    if(o.isMesh){
+      o.frustumCulled = false;
+      if(o.material){
+        const m = o.material.clone();
+        o.material = m;
+        uniqueMats.push(m);
+      }
+    }
+  });
+
+  const wrapper = new THREE.Group();
+  wrapper.add(root);
+  wrapper.scale.setScalar(ZOMBIE_SCALE);
+  root.rotation.y = ZOMBIE_FACING_YAW;
+
+  const lane = LANES[Math.floor(Math.random()*LANES.length)];
+  const jitter = (Math.random()-0.5)*0.6;
+  wrapper.position.set(lane+jitter, 0, SPAWN_Z);
+  scene.add(wrapper);
+
+  let mixer=null, action=null;
+  if(baseClip){
+    mixer = new THREE.AnimationMixer(root);
+    action = mixer.clipAction(baseClip);
+    action.play();
+    mixer.setTime(Math.random()*baseClip.duration);
+  }
+
+  const hitBox = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 1.9, 6),
+    new THREE.MeshBasicMaterial({ visible:false })
+  );
+  hitBox.position.set(wrapper.position.x, 1.0, wrapper.position.z);
+  scene.add(hitBox);
+
+  const z = {
+    wrapper, root, mixer, uniqueMats, hitBox,
+    x: wrapper.position.x, zpos: wrapper.position.z,
+    speed: waveSpeed(wave) * (0.85+Math.random()*0.3),
+    hp: waveHP(wave),
+    maxHp: waveHP(wave),
+    alive: true, dying:false,
+    flashT: 0,
+  };
+  hitBox.userData.zombie = z;
+  zombies.push(z);
+}
+
+function flashHit(z){
+  z.flashT = 1;
+}
+
+function killZombie(z){
+  if(z.dying) return;
+  z.dying = true;
+  z.alive = false;
+  scene.remove(z.hitBox);
+  const zombIndex = zombies.indexOf(z);
+
+  const startY = z.wrapper.position.y;
+  const startScale = z.wrapper.scale.x;
+  const t0 = performance.now();
+  const dur = 480;
+  function anim(){
+    const t = Math.min(1, (performance.now()-t0)/dur);
+    z.wrapper.rotation.z = t * 1.3;
+    z.wrapper.position.y = startY - t*0.9;
+    z.wrapper.scale.setScalar(startScale*(1-t*0.6));
+    z.uniqueMats.forEach(m=>{ m.transparent=true; m.opacity = 1-t; });
+    if(t<1) requestAnimationFrame(anim);
+    else removeZombie(z, true);
+  }
+  anim();
+}
+
+function removeZombie(z, spliceOut){
+  scene.remove(z.wrapper);
+  if(z.hitBox.parent) scene.remove(z.hitBox);
+  z.uniqueMats.forEach(m=>m.dispose());
+  if(spliceOut){
+    const i = zombies.indexOf(z);
+    if(i>=0) zombies.splice(i,1);
+  }
+}
+
+function crossLine(z){
+  if(z.dying) return;
+  z.dying = true; z.alive = false;
+  scene.remove(z.hitBox);
+  removeZombie(z, true);
+  hp -= 14;
+  updateHUD();
+  screenFlash();
+  shakeCamera();
+  sfxHurt();
+  if(hp<=0){ hp=0; updateHUD(); endGame(); }
+}
+
+function screenFlash(){
+  flashEl.style.transition = 'none';
+  flashEl.style.opacity = '0.45';
+  requestAnimationFrame(()=>{
+    flashEl.style.transition = 'opacity .5s ease';
+    flashEl.style.opacity = '0';
+  });
+}
+
+let shakeT = 0;
+function shakeCamera(){ shakeT = 0.35; }
+
+function endGame(){
+  state = 'gameover';
+  hudEl.classList.add('hidden');
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('final-wave').textContent = wave;
+  document.getElementById('final-kills').textContent = kills;
+  gameoverScreen.classList.remove('hidden');
+  for(const z of [...zombies]) removeZombie(z,false);
+  zombies = [];
+}
+
+/* ---- input ---- */
+function popText(clientX, clientY, text, isKill){
+  const el = document.createElement('div');
+  el.className = 'pop' + (isKill?' kill':'');
+  el.textContent = text;
+  el.style.left = clientX+'px';
+  el.style.top = clientY+'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 720);
+}
+function ripple(clientX, clientY){
+  const el = document.createElement('div');
+  el.className = 'ripple';
+  el.style.left = clientX+'px';
+  el.style.top = clientY+'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 360);
+}
+
+function onTap(clientX, clientY){
+  if(state !== 'playing') return;
+  audio(); // ensure resumed on gesture
+  ripple(clientX, clientY);
+  sfxShoot();
+
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX-rect.left)/rect.width)*2-1,
+    -((clientY-rect.top)/rect.height)*2+1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const boxes = zombies.filter(z=>z.alive).map(z=>z.hitBox);
+  const hits = raycaster.intersectObjects(boxes, false);
+  if(hits.length===0) return;
+
+  const z = hits[0].object.userData.zombie;
+  if(!z || !z.alive) return;
+
+  z.hp -= 1;
+  flashHit(z);
+  sfxHit();
+
+  const now = performance.now()/1000;
+  if(z.hp<=0){
+    kills++;
+    if(now - lastKillTime < 1.3){ comboCount++; } else { comboCount = 1; }
+    lastKillTime = now;
+    const mult = 1 + Math.floor(comboCount/3)*0.5;
+    const gained = Math.round(10*mult);
+    score += gained;
+    updateHUD();
+    popText(clientX, clientY, '+'+gained, true);
+    if(comboCount>=3){
+      comboLabel.textContent = 'COMBO x'+(1+Math.floor(comboCount/3)*0.5);
+      comboLabel.classList.add('show');
+      clearTimeout(comboLabel._t);
+      comboLabel._t = setTimeout(()=>comboLabel.classList.remove('show'), 900);
+    }
+    sfxKill();
+    killZombie(z);
+  } else {
+    popText(clientX, clientY, 'HIT', false);
+  }
+}
+
+canvas.addEventListener('pointerdown', (e)=>{ onTap(e.clientX, e.clientY); });
+
+document.getElementById('start-btn').addEventListener('click', ()=>{ audio(); startGame(); });
+document.getElementById('retry-btn').addEventListener('click', ()=>{ audio(); startGame(); });
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+
+  // torch flicker
+  torch1.intensity = 1.9 + Math.sin(t*9.1)*0.35 + Math.sin(t*23.0)*0.15;
+  torch2.intensity = 1.9 + Math.sin(t*7.7+1.3)*0.35 + Math.sin(t*19.0+2)*0.15;
+
+  // dead line pulse
+  lineMat.opacity = 0.4 + Math.sin(t*2.2)*0.15;
+
+  // camera idle sway + shake
+  let sx=0, sy=0;
+  if(shakeT>0){
+    shakeT -= dt;
+    const s = shakeT*6;
+    sx = (Math.random()-0.5)*s*0.2;
+    sy = (Math.random()-0.5)*s*0.2;
+  }
+  camera.position.x = camBase.x + Math.sin(t*0.35)*0.06 + sx;
+  camera.position.y = camBase.y + Math.sin(t*0.5)*0.03 + sy;
+
+  if(state==='playing'){
+    // spawning
+    if(!betweenWaves){
+      spawnTimer -= dt;
+      if(spawnTimer<=0 && spawnedThisWave<waveTarget && zombies.length<MAX_ALIVE){
+        spawnZombie();
+        spawnedThisWave++;
+        spawnTimer = spawnInterval;
+      }
+      if(spawnedThisWave>=waveTarget && zombies.length===0){
+        betweenWaves = true;
+        waveDelayTimer = 1.6;
+      }
+    } else {
+      waveDelayTimer -= dt;
+      if(waveDelayTimer<=0) nextWave();
+    }
+
+    // update zombies
+    for(const z of zombies){
+      if(!z.alive) continue;
+      if(z.mixer) z.mixer.update(dt);
+      z.zpos += z.speed*dt;
+      z.wrapper.position.z = z.zpos;
+      z.hitBox.position.z = z.zpos;
+
+      if(z.flashT>0){
+        z.flashT = Math.max(0, z.flashT - dt*4);
+        z.uniqueMats.forEach(m=>{
+          if(m.emissive){ m.emissive.setRGB(z.flashT*1.2, 0, 0); }
+        });
+      }
+
+      if(z.zpos >= LINE_Z){
+        crossLine(z);
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+tick();
+</script>
+</body>
+</html>
